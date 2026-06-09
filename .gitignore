@@ -1,0 +1,11 @@
+# A content-only plugin has no build output, but ignore these defensively
+# in case the plugin is ever opened inside a code project context.
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+
+# OS / editor cruft
+*.tmp
+Thumbs.db
+.DS_Store
