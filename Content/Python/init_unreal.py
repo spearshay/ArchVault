@@ -5,7 +5,14 @@ Adds a top-level "ArchVault" menu to the Unreal Editor main menu bar so the
 library is always one click away in any project that has this plugin enabled.
 Runs automatically on editor startup (requires the Python Editor Script Plugin).
 """
+import os
+import sys
 import unreal
+
+# Make this folder importable so menu commands can `import archvault_sync`.
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _THIS_DIR not in sys.path:
+    sys.path.append(_THIS_DIR)
 
 _SUBMENU = "LevelEditor.MainMenu.ArchVaultMenu"
 
@@ -42,6 +49,22 @@ def _build_menu():
         "import unreal; unreal.get_editor_subsystem(unreal.AssetEditorSubsystem)"
         ".open_editor_for_assets([unreal.load_asset('/ArchVault/Masters/M_Master_Arch')])")
     sub.add_menu_entry("ArchVault", master)
+
+    push = unreal.ToolMenuEntry(name="ArchVault_Push",
+                                type=unreal.MultiBlockType.MENU_ENTRY)
+    push.set_label("Push to GitHub  (commit + push)")
+    push.set_tool_tip("Stage + commit local changes and push the library to GitHub")
+    push.set_string_command(unreal.ToolMenuStringCommandType.PYTHON, "",
+                            "import archvault_sync; archvault_sync.push()")
+    sub.add_menu_entry("Sync", push)
+
+    pull = unreal.ToolMenuEntry(name="ArchVault_Pull",
+                                type=unreal.MultiBlockType.MENU_ENTRY)
+    pull.set_label("Pull from GitHub  (get latest)")
+    pull.set_tool_tip("Pull the latest version of the library from GitHub")
+    pull.set_string_command(unreal.ToolMenuStringCommandType.PYTHON, "",
+                            "import archvault_sync; archvault_sync.pull()")
+    sub.add_menu_entry("Sync", pull)
 
     menus.refresh_all_widgets()
     unreal.log("ArchVault: registered top-level menu")
