@@ -12,15 +12,47 @@ Content/
   Textures/     Shared texture maps
 ```
 
-## Usage
+## Install
 
-1. Clone/copy this repo into `<YourProject>/Plugins/ArchVault`.
-2. Enable **ArchVault** in the project's `.uproject` (or it auto-enables — `EnabledByDefault`).
-3. Assets appear in the Content Browser under the **ArchVault** root.
+### Prerequisites (one time per machine)
+
+- **Unreal Engine 5.7** (or newer).
+- **Git** and **Git LFS**. After installing Git LFS, run it once:
+  ```bash
+  git lfs install
+  ```
+  This is required: the asset files (`.uasset`, textures, etc.) are stored via Git LFS. A plain clone *without* LFS pulls down small pointer files instead of the real assets, and the materials will fail to load in Unreal.
+
+### Option A — clone into a project (keeps version history)
+
+```bash
+cd <YourProject>/Plugins
+git clone https://github.com/spearshay/archvault.git ArchVault
+```
+
+The folder **must** be named `ArchVault` so assets mount at the stable `/ArchVault/...` path and references don't break.
+
+### Option B — copy the folder (simplest for non-developers)
+
+Copy the `ArchVault` plugin folder into `<YourProject>/Plugins/ArchVault`. Make sure you copy from a checkout where LFS content was actually pulled (real assets, not pointer files) — otherwise clone with LFS instead.
+
+### Enable it
+
+1. Open the project. ArchVault **auto-enables** (`"EnabledByDefault": true`), or enable it manually in **Edit → Plugins → Asset Library → ArchVault** and restart.
+2. Assets appear in the Content Browser under the **ArchVault** root.
+
+## Sharing with others
+
+ArchVault is a self-contained, content-only plugin — it works in any UE 5.7+ project on any machine, for you or anyone else. To share it:
+
+- **With repo access:** they clone it exactly as in Option A (needs read access to `spearshay/archvault`).
+- **Without git:** zip the `ArchVault` folder (with real LFS assets pulled down) and send it; they drop it into `Plugins/`.
+
+This project is released under the **MIT License** (see [`LICENSE`](LICENSE)), so others are free to use, copy, and modify it.
 
 ## Version control
 
-Binary assets are tracked with **Git LFS** (see `.gitattributes`). Requires `git lfs install` once per machine. Because UE assets are binary and cannot be merged, treat edits as **lock-based / sequential** across machines (`git lfs lock` if a remote with locking is used).
+Binary assets are tracked with **Git LFS** (see `.gitattributes`). Because UE assets are binary and **cannot be merged**, treat edits as **lock-based / sequential** across machines and collaborators (`git lfs lock` if a remote with locking is used). Read-and-use by many people in parallel is fine; simultaneous *editing* of the same asset is what to coordinate — if two people edit and both push, one set of changes is overwritten.
 
 ## Engine
 
