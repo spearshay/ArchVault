@@ -102,6 +102,106 @@ extractor (PLAN.md §3.3).
 
 ---
 
+## Repo bootstrap — give the Blender tooling a real home (do this locally, first)
+
+These docs currently sit on a feature branch of `ArchVault` **only because the remote
+task was pinned there**. `ArchVault` is the Unreal content plugin; Blender pipeline
+code/docs don't belong in its history. First thing the local session should do is
+stand up a dedicated repo and migrate these in alongside the real scripts.
+
+**Scope rule:** this repo holds *code, specs, docs, and SMALL reusable node-group
+assets* — **never** the heavy working `.blend` files (61st ~225 MB, etc.). Those stay
+on Drive. Sellable products (**LFG**) get their *own* repo later — different audience,
+licensing, release cadence; do not fold LFG in here.
+
+### Target structure
+```
+craydl-blender-pipeline/            # name is Shay's call
+  addons/
+    craydl_revit_pipeline/
+      __init__.py                   # bl_info + register(); was craydl_revit_pipeline_addon.py
+      revit_fbx_cleanup.py          # moved from E:\...\Shay's Scripts\
+      fixture_swap.py               #   "
+      revit_reconcile_export.py     # NEW toolkit (PLAN.md §4)
+      panels/                       # N-panel UI under the "Craydl" tab
+  dynamo/                           # Vinny-side .dyn graphs (import path)
+  docs/
+    reconciliation/                 # PLAN.md, HANDOFF.md  ← move these here
+    pipeline/                       # REF_06/06b, wall-classify, conventions, salvaged specs
+  assets/                           # SMALL node-group .blend only (via Git LFS)
+  .gitignore
+  .gitattributes
+  README.md
+```
+
+### Starter `.gitignore`
+```gitignore
+# Heavy working files live on Drive, never here
+*.blend1
+SIXTY-FIRST*.blend
+*_WIP*.blend
+# Blender / Python cruft
+__pycache__/
+*.pyc
+*.tmp
+*.log
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+```
+
+### Starter `.gitattributes` (only if you commit small node-group assets)
+```gitattributes
+# Track ONLY small reusable node-group libraries in LFS — not project files
+assets/**/*.blend filter=lfs diff=lfs merge=lfs -text
+```
+If you'd rather avoid LFS entirely at the start, keep `assets/` empty and drop the
+`.gitattributes` — the toolkit is pure Python + `.dyn` and needs no binaries.
+
+### Starter `README.md`
+```markdown
+# craydl-blender-pipeline
+
+Internal Blender → Revit production tooling for Craydl. Companion to the Unreal-side
+`ArchVault`; not a sellable product (see the separate LFG repo for that).
+
+## Contents
+- `addons/craydl_revit_pipeline/` — N-panel addon ("Craydl" tab) wrapping the
+  source-of-truth pipeline scripts (FBX cleanup, fixture swap, reconciliation export)
+  with DRY_RUN / SCOPE / RUN_STAGES guards and stdout report capture.
+- `dynamo/` — Revit-side Dynamo graphs that consume the reconciliation export.
+- `docs/` — architecture (`reconciliation/PLAN.md`), pipeline conventions, tool specs.
+
+## Not in this repo
+Heavy working `.blend` files (61st, etc.) live on Google Drive. Only small reusable
+node-group assets belong here (via Git LFS).
+
+## Install
+Symlink or zip `addons/craydl_revit_pipeline/` into Blender's addons dir, enable
+"Craydl Revit Pipeline" in Preferences, set the scripts dir in AddonPreferences.
+```
+
+### Migration steps (local session runs these)
+1. `git init` the new repo (or create it on GitHub and clone).
+2. **Move** `PLAN.md` + `HANDOFF.md` from the `ArchVault` branch into
+   `docs/reconciliation/` here. Then drop them from the `ArchVault` branch so that repo
+   stays Unreal-only (don't merge that branch to `ArchVault/main`).
+3. Copy the **live** `E:\...\Shay's Scripts\` files into `addons/` and `docs/pipeline/`
+   (cleanup, fixture_swap, the addon, REF_06/06b, wall-classify, tag_connecter, plus
+   the salvaged tool specs worth versioning).
+4. Refactor the single-file addon into the `addons/craydl_revit_pipeline/` package
+   (only if convenient — a single `__init__.py` is fine to start).
+5. First commit: *"Seed Craydl Blender pipeline repo (addon + scripts + reconciliation
+   plan)."* Optional: mirror ArchVault's git-sync panel for cross-machine parity.
+
+> Optional convenience: you already built `archvault_sync.py`-style push/pull for the
+> Unreal repo. The same operator pattern can live in this addon so the Blender machine
+> stays in parity without leaving Blender.
+
+---
+
 ## Carried-forward human decisions (still blocking — PLAN.md §10)
 
 - **Vinny:** import path (CSV+Dynamo?), the ANCHOR point + its Internal-Origin
