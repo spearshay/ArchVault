@@ -17,6 +17,38 @@ if _THIS_DIR not in sys.path:
 _SUBMENU = "LevelEditor.MainMenu.ArchVaultMenu"
 
 
+def browse():
+    """Reveal the ArchVault library in the Content Browser.
+
+    Dynamic (resolves assets at click time) so it survives renames/reorg —
+    syncs to the master materials, falling back to any ArchVault asset.
+    """
+    assets = unreal.EditorAssetLibrary.list_assets(
+        "/ArchVault/Masters", recursive=False, include_folder=False)
+    if not assets:
+        assets = unreal.EditorAssetLibrary.list_assets(
+            "/ArchVault", recursive=True, include_folder=False)[:1]
+    if assets:
+        unreal.EditorAssetLibrary.sync_browser_to_objects([a.split(".")[0] for a in assets])
+    else:
+        unreal.log_warning("ArchVault: no assets found under /ArchVault to browse.")
+
+
+def open_master():
+    """Open an ArchVault master material (prefers the opaque master)."""
+    prefer = ["/ArchVault/Masters/M_Opaque_Master", "/ArchVault/Masters/M_Metal_Master"]
+    target = next((p for p in prefer if unreal.EditorAssetLibrary.does_asset_exist(p)), None)
+    if target is None:
+        masters = unreal.EditorAssetLibrary.list_assets(
+            "/ArchVault/Masters", recursive=False, include_folder=False)
+        target = masters[0].split(".")[0] if masters else None
+    if target is None:
+        unreal.log_warning("ArchVault: no master material found under /ArchVault/Masters.")
+        return
+    unreal.get_editor_subsystem(unreal.AssetEditorSubsystem).open_editor_for_assets(
+        [unreal.load_asset(target)])
+
+
 def _build_menu():
     menus = unreal.ToolMenus.get()
     # Already added this session? Don't duplicate.
@@ -35,19 +67,16 @@ def _build_menu():
     browse.set_tool_tip("Jump the Content Browser to the ArchVault materials")
     browse.set_string_command(
         unreal.ToolMenuStringCommandType.PYTHON, "",
-        "import unreal; unreal.EditorAssetLibrary.sync_browser_to_objects("
-        "['/ArchVault/Masters/M_Master_Arch','/ArchVault/Instances/MI_Wood',"
-        "'/ArchVault/Instances/MI_Metal'])")
+        "import init_unreal; init_unreal.browse()")
     sub.add_menu_entry("ArchVault", browse)
 
     master = unreal.ToolMenuEntry(name="ArchVault_OpenMaster",
                                   type=unreal.MultiBlockType.MENU_ENTRY)
     master.set_label("Open Master Material")
-    master.set_tool_tip("Open M_Master_Arch in the Material Editor")
+    master.set_tool_tip("Open the ArchVault master material in the Material Editor")
     master.set_string_command(
         unreal.ToolMenuStringCommandType.PYTHON, "",
-        "import unreal; unreal.get_editor_subsystem(unreal.AssetEditorSubsystem)"
-        ".open_editor_for_assets([unreal.load_asset('/ArchVault/Masters/M_Master_Arch')])")
+        "import init_unreal; init_unreal.open_master()")
     sub.add_menu_entry("ArchVault", master)
 
     push = unreal.ToolMenuEntry(name="ArchVault_Push",
