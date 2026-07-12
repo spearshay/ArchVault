@@ -58,6 +58,8 @@ finish library — any metal × finish combo (polished, brushed, aged, oil-rubbe
 packed), not per-combination texture sets. Full build spec and workflow:
 [`docs/METAL_SYSTEM.md`](docs/METAL_SYSTEM.md).
 
+- `Content/Python/archvault_build_master.py` — `build()` constructs the whole
+  `M_Metal_Master` graph in code (clean rebuild), so you don't hand-wire it.
 - `Content/Python/archvault_metals.py` — builds the `MI_Metal_Base → MI_<Metal>
   → MI_<Metal>_<Finish>` instance hierarchy from `metal_manifest.json`. Edit the
   manifest, re-run `archvault_metals.build()`; don't hand-edit instances.

@@ -81,6 +81,12 @@ Aged Metallic Drop                | Scalar          | 0.15    | Metallic reduced
 
 ## 3. Node-by-node build (laptop session, UE open)
 
+**Fastest path — build it programmatically:** run `import archvault_build_master;
+archvault_build_master.build()` in the UE Python console. It clean-rebuilds
+`M_Metal_Master` with every parameter and wire below, matching the exact names
+`archvault_metals.py` expects. The manual steps here are the reference for what
+that script constructs (and for hand-tweaks afterward).
+
 Create `Material'/ArchVault/Masters/M_Metal_Master'`, Shading Model **Default
 Lit**, and wire:
 
