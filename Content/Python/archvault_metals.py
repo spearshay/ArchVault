@@ -25,7 +25,8 @@ _MANIFEST = os.path.join(_THIS_DIR, "metal_manifest.json")
 # Parameter names on M_Metal_Master — keep in sync with docs/METAL_SYSTEM.md.
 P_TINT = "Metal Tint"
 P_METALLIC = "Metallic"
-P_RMA = "Finish RMA"
+P_ROUGHNESS = "Roughness"          # scalar, used when Use Roughness Map is OFF
+P_ROUGH_TEX = "Finish Roughness"   # single-channel grayscale, used when ON
 P_ROUGH_MIN = "Roughness Min"
 P_ROUGH_MAX = "Roughness Max"
 P_NORMAL = "Finish Normal"
@@ -36,6 +37,7 @@ P_AGING_AMT = "Aging Amount"
 P_AGED_TINT = "Aged Tint"
 P_AGED_ROUGH = "Aged Roughness"
 P_AGED_METAL_DROP = "Aged Metallic Drop"
+S_USE_ROUGH_MAP = "Use Roughness Map"
 S_USE_NORMAL = "Use Finish Normal"
 S_USE_ANISO = "Use Anisotropy"
 S_USE_AGING = "Use Aging"
@@ -90,12 +92,15 @@ def _texture(finishes_folder, tex_name):
 
 def _apply_finish(mic, finish, metal, m, finishes_folder):
     """Write one finish recipe onto an instance."""
-    _MEL.set_material_instance_scalar_parameter_value(mic, P_ROUGH_MIN, finish.get("rough_min", 0.04))
-    _MEL.set_material_instance_scalar_parameter_value(mic, P_ROUGH_MAX, finish.get("rough_max", 0.12))
-
-    rma = _texture(finishes_folder, finish.get("rma"))
-    if rma:
-        _MEL.set_material_instance_texture_parameter_value(mic, P_RMA, rma)
+    # Roughness: scalar path (no map) vs. grayscale-map path (remapped by min/max).
+    rough_map = _texture(finishes_folder, finish.get("rough_map"))
+    _set_static_switch(mic, S_USE_ROUGH_MAP, rough_map is not None)
+    if rough_map is not None:
+        _MEL.set_material_instance_texture_parameter_value(mic, P_ROUGH_TEX, rough_map)
+        _MEL.set_material_instance_scalar_parameter_value(mic, P_ROUGH_MIN, finish.get("rough_min", 0.05))
+        _MEL.set_material_instance_scalar_parameter_value(mic, P_ROUGH_MAX, finish.get("rough_max", 0.15))
+    else:
+        _MEL.set_material_instance_scalar_parameter_value(mic, P_ROUGHNESS, finish.get("roughness", 0.08))
 
     normal = _texture(finishes_folder, finish.get("normal"))
     _set_static_switch(mic, S_USE_NORMAL, normal is not None)
@@ -184,7 +189,9 @@ def build(dry_run=False):
 def import_finish_textures(source_dir):
     """Import authored finish maps with correct settings.
 
-    *_N.* -> Normalmap compression;  everything else -> Masks. sRGB off for all.
+    *_N.* -> Normalmap compression;  everything else (roughness/masks) ->
+    single-channel Grayscale. sRGB off for all. Metals don't pack, so finish
+    roughness maps are grayscale, not RGB masks.
     """
     cfg = _load_manifest()
     dest = cfg["finishes_folder"]
@@ -217,6 +224,6 @@ def import_finish_textures(source_dir):
         tex.set_editor_property(
             "compression_settings",
             unreal.TextureCompressionSettings.TC_NORMALMAP if is_normal
-            else unreal.TextureCompressionSettings.TC_MASKS)
+            else unreal.TextureCompressionSettings.TC_GRAYSCALE)
         _EAL.save_loaded_asset(tex)
-        unreal.log("Imported %s (%s, sRGB off)" % (path, "Normalmap" if is_normal else "Masks"))
+        unreal.log("Imported %s (%s, sRGB off)" % (path, "Normalmap" if is_normal else "Grayscale"))
