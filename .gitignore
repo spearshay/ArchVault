@@ -5,6 +5,10 @@ Intermediate/
 Saved/
 DerivedDataCache/
 
+# Python bytecode cache (regenerated on import; machine/version specific)
+__pycache__/
+*.pyc
+
 # OS / editor cruft
 *.tmp
 Thumbs.db
