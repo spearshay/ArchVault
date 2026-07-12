@@ -50,6 +50,20 @@ ArchVault is a self-contained, content-only plugin — it works in any UE 5.7+ p
 
 This project is released under the **MIT License** (see [`LICENSE`](LICENSE)), so others are free to use, copy, and modify it.
 
+## Metals workflow
+
+Metals use a dedicated master (`M_Metal_Master`) with a shared, metal-agnostic
+finish library — any metal × finish combo (polished, brushed, aged, oil-rubbed,
+…) comes from tints + ~10 shared maps, not per-combination texture sets. Full
+build spec and workflow: [`docs/METAL_SYSTEM.md`](docs/METAL_SYSTEM.md).
+
+- `Content/Python/archvault_metals.py` — builds the `MI_Metal_Base → MI_<Metal>
+  → MI_<Metal>_<Finish>` instance hierarchy from `metal_manifest.json`. Edit the
+  manifest, re-run `archvault_metals.build()`; don't hand-edit instances.
+- `Content/Python/archvault_audit.py` — read-only library audit
+  (`archvault_audit.report()`): duplicate alphas, redundant maps, orphans; with
+  reference-safe fix/delete helpers.
+
 ## Version control
 
 Binary assets are tracked with **Git LFS** (see `.gitattributes`). Because UE assets are binary and **cannot be merged**, treat edits as **lock-based / sequential** across machines and collaborators (`git lfs lock` if a remote with locking is used). Read-and-use by many people in parallel is fine; simultaneous *editing* of the same asset is what to coordinate — if two people edit and both push, one set of changes is overwritten.

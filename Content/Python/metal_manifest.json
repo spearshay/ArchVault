@@ -1,0 +1,54 @@
+{
+  "master": "/ArchVault/Masters/M_Metal_Master",
+  "instance_folder": "/ArchVault/Instances/Metal",
+  "finishes_folder": "/ArchVault/Textures/Metals/Finishes",
+  "base_instance": "MI_Metal_Base",
+
+  "metals": {
+    "Gold":   { "tint": [1.000, 0.766, 0.336], "aged_tint": [0.45, 0.30, 0.10] },
+    "Brass":  { "tint": [0.910, 0.778, 0.423], "aged_tint": [0.32, 0.22, 0.09] },
+    "Copper": { "tint": [0.955, 0.637, 0.538], "aged_tint": [0.20, 0.35, 0.30] },
+    "Bronze": { "tint": [0.804, 0.498, 0.311], "aged_tint": [0.18, 0.12, 0.07] },
+    "Nickel": { "tint": [0.660, 0.609, 0.526], "aged_tint": [0.30, 0.28, 0.24] },
+    "Steel":  { "tint": [0.560, 0.570, 0.580], "aged_tint": [0.22, 0.22, 0.23] },
+    "Iron":   { "tint": [0.530, 0.510, 0.500], "aged_tint": [0.25, 0.13, 0.08] },
+    "Chrome": { "tint": [0.550, 0.556, 0.554], "aged_tint": [0.25, 0.25, 0.26] }
+  },
+
+  "finishes": {
+    "Polished":  { "rough_min": 0.04, "rough_max": 0.12 },
+    "Satin":     { "rough_min": 0.15, "rough_max": 0.30 },
+    "Matte":     { "rough_min": 0.35, "rough_max": 0.55 },
+    "Brushed":   { "rough_min": 0.20, "rough_max": 0.45,
+                   "rma": "T_Finish_Brushed_RMA",
+                   "normal": "T_Finish_Brushed_N", "normal_strength": 1.0,
+                   "anisotropy": 0.6 },
+    "Hammered":  { "rough_min": 0.15, "rough_max": 0.35,
+                   "rma": "T_Finish_Hammered_RMA",
+                   "normal": "T_Finish_Hammered_N", "normal_strength": 1.0 },
+    "Aged":      { "rough_min": 0.25, "rough_max": 0.55,
+                   "rma": "T_Finish_Worn_RMA",
+                   "aging": 0.50, "aged_roughness": 0.65, "aged_metallic_drop": 0.15 },
+    "Vintage":   { "rough_min": 0.30, "rough_max": 0.60,
+                   "rma": "T_Finish_Worn_RMA",
+                   "normal": "T_Finish_Brushed_N", "normal_strength": 0.4,
+                   "aging": 0.65, "aged_roughness": 0.70, "aged_metallic_drop": 0.20 },
+    "OilRubbed": { "rough_min": 0.40, "rough_max": 0.65,
+                   "rma": "T_Finish_Worn_RMA",
+                   "aging": 0.85, "aged_roughness": 0.75, "aged_metallic_drop": 0.25,
+                   "aged_tint_override": [0.04, 0.03, 0.02] }
+  },
+
+  "build": {
+    "Brass":  ["Polished", "Satin", "Brushed", "Aged"],
+    "Nickel": ["Polished", "Satin", "Brushed"],
+    "Bronze": ["OilRubbed", "Aged"],
+    "Gold":   ["Polished", "Brushed"],
+    "Steel":  ["Brushed", "Matte"],
+    "Iron":   ["Aged"],
+    "Chrome": ["Polished"],
+    "Copper": ["Polished", "Vintage"]
+  },
+
+  "_comment": "tints are linear RGB (measured metal albedos). Per-metal MI_<Metal> parents are always created; MI_<Metal>_<Finish> children only for combos listed in 'build'. Finish 'rma'/'normal' names resolve inside finishes_folder. Edit here, then re-run archvault_metals.build() — don't hand-edit instances."
+}
