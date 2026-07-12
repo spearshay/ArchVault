@@ -54,8 +54,9 @@ This project is released under the **MIT License** (see [`LICENSE`](LICENSE)), s
 
 Metals use a dedicated master (`M_Metal_Master`) with a shared, metal-agnostic
 finish library — any metal × finish combo (polished, brushed, aged, oil-rubbed,
-…) comes from tints + ~10 shared maps, not per-combination texture sets. Full
-build spec and workflow: [`docs/METAL_SYSTEM.md`](docs/METAL_SYSTEM.md).
+…) comes from tints + ~5 shared grayscale maps (metallic/AO are scalars, not
+packed), not per-combination texture sets. Full build spec and workflow:
+[`docs/METAL_SYSTEM.md`](docs/METAL_SYSTEM.md).
 
 - `Content/Python/archvault_metals.py` — builds the `MI_Metal_Base → MI_<Metal>
   → MI_<Metal>_<Finish>` instance hierarchy from `metal_manifest.json`. Edit the

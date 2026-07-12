@@ -16,25 +16,20 @@
   },
 
   "finishes": {
-    "Polished":  { "rough_min": 0.04, "rough_max": 0.12 },
-    "Satin":     { "rough_min": 0.15, "rough_max": 0.30 },
-    "Matte":     { "rough_min": 0.35, "rough_max": 0.55 },
-    "Brushed":   { "rough_min": 0.20, "rough_max": 0.45,
-                   "rma": "T_Finish_Brushed_RMA",
+    "Polished":  { "roughness": 0.08 },
+    "Satin":     { "roughness": 0.22 },
+    "Matte":     { "roughness": 0.45 },
+    "Brushed":   { "rough_map": "T_Finish_Brushed_R", "rough_min": 0.20, "rough_max": 0.45,
                    "normal": "T_Finish_Brushed_N", "normal_strength": 1.0,
                    "anisotropy": 0.6 },
-    "Hammered":  { "rough_min": 0.15, "rough_max": 0.35,
-                   "rma": "T_Finish_Hammered_RMA",
+    "Hammered":  { "rough_map": "T_Finish_Hammered_R", "rough_min": 0.15, "rough_max": 0.35,
                    "normal": "T_Finish_Hammered_N", "normal_strength": 1.0 },
-    "Aged":      { "rough_min": 0.25, "rough_max": 0.55,
-                   "rma": "T_Finish_Worn_RMA",
+    "Aged":      { "rough_map": "T_Finish_Worn_R", "rough_min": 0.25, "rough_max": 0.55,
                    "aging": 0.50, "aged_roughness": 0.65, "aged_metallic_drop": 0.15 },
-    "Vintage":   { "rough_min": 0.30, "rough_max": 0.60,
-                   "rma": "T_Finish_Worn_RMA",
+    "Vintage":   { "rough_map": "T_Finish_Worn_R", "rough_min": 0.30, "rough_max": 0.60,
                    "normal": "T_Finish_Brushed_N", "normal_strength": 0.4,
                    "aging": 0.65, "aged_roughness": 0.70, "aged_metallic_drop": 0.20 },
-    "OilRubbed": { "rough_min": 0.40, "rough_max": 0.65,
-                   "rma": "T_Finish_Worn_RMA",
+    "OilRubbed": { "rough_map": "T_Finish_Worn_R", "rough_min": 0.40, "rough_max": 0.65,
                    "aging": 0.85, "aged_roughness": 0.75, "aged_metallic_drop": 0.25,
                    "aged_tint_override": [0.04, 0.03, 0.02] }
   },
@@ -50,5 +45,5 @@
     "Copper": ["Polished", "Vintage"]
   },
 
-  "_comment": "tints are linear RGB (measured metal albedos). Per-metal MI_<Metal> parents are always created; MI_<Metal>_<Finish> children only for combos listed in 'build'. Finish 'rma'/'normal' names resolve inside finishes_folder. Edit here, then re-run archvault_metals.build() — don't hand-edit instances."
+  "_comment": "tints are linear RGB (measured metal albedos). Per-metal MI_<Metal> parents are always created; MI_<Metal>_<Finish> children only for combos listed in 'build'. Metals don't pack: metallic/AO are scalars. A finish with 'roughness' uses the scalar path (no map); a finish with 'rough_map' uses a single-channel grayscale map remapped by rough_min/max. 'rough_map'/'normal' names resolve inside finishes_folder. Edit here, then re-run archvault_metals.build() — don't hand-edit instances."
 }

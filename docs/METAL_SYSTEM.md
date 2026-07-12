@@ -11,29 +11,40 @@ and those maps are metal-agnostic, so every metal shares them.
 
 ---
 
-## 1. Channel-packing convention (RMA)
+## 1. Metals do NOT pack (single-channel roughness + scalar M/AO)
 
-Matches the existing `Use Packed RMA` toggle in `M_Opaque_Master`:
+Deliberate departure from `M_Opaque_Master`'s `Use Packed RMA` (R=rough,
+G=metal, B=AO). Clean metals have **constant** metallic (1.0) and **constant**
+material-scale AO (1.0) — so packing them would store two flat-white channels
+for nothing. It also saves **zero samplers**: a lone roughness map is already a
+single lookup, same as a packed one; you only save samplers by packing when the
+other channels are real *maps*, and here they aren't. Scalar metallic/AO cost
+no texture fetch at all.
 
-| Channel | Content            |
-|---------|--------------------|
-| R       | Roughness          |
-| G       | Metallic           |
-| B       | Ambient Occlusion  |
+So for metals:
 
-Texture import settings for every packed/mask map (enforced by
+| Channel role | Source                                   |
+|--------------|------------------------------------------|
+| Metallic     | **scalar param** (1.0); aging drops it   |
+| AO           | **scalar param** (1.0); object AO = mesh-baked |
+| Roughness    | **single-channel grayscale map** (only for brushed/hammered/worn) |
+
+Texture import settings (enforced by
 `archvault_metals.import_finish_textures()`):
 
-- **sRGB: OFF**
-- **Compression: Masks (TC_Masks)** — no cross-channel compression bleed
-- Normal maps: **Compression: Normalmap (TC_Normalmap)**, sRGB OFF
-- Tiling textures: 2K is plenty for hardware-scale finishes; power-of-two, seamless
+- **Roughness maps (`*_R`):** single-channel — **Compression: Grayscale
+  (TC_Grayscale)**, **sRGB OFF**. ~half the memory of a packed RGB mask.
+- **Normal maps (`*_N`):** **Compression: Normalmap (TC_Normalmap)**, sRGB OFF.
+- **Aging masks:** grayscale, sRGB OFF (reused from `/ArchVault/Textures/Alphas`).
+- Tiling textures: 2K is plenty for hardware-scale finishes; power-of-two, seamless.
 
-Note for metals: the G (metallic) channel is ~constant white, and the master
-exposes a scalar `Metallic` param that can override it entirely — so most
-finish maps only genuinely need R (finish roughness) and B (AO, often flat
-white for tiling finishes). Keep the RMA layout anyway for consistency with
-the opaque master and future reuse.
+When would a metal genuinely need a metallic or AO *map*? Only composite "hero"
+surfaces where metal and non-metal are baked into one texture — painted metal
+chipping to bare metal, rust (a dielectric, metallic≈0), labels, worn coatings —
+or deep cast relief wanting material-scale occlusion. Our system produces those
+looks via the shader-side **aging layer** instead, so we never bake them. If you
+ever hit a true composite hero metal, use `M_Opaque_Master` (which has the packed
+RMA path) rather than bloating this master.
 
 ---
 
@@ -44,10 +55,13 @@ Group / Parameter                | Type            | Default | Notes
 **Base**                          |                 |         |
 Metal Tint                        | Vector          | Brass   | THE per-metal control (see §5 tint table)
 Metallic                          | Scalar          | 1.0     | Rarely touched; aging pulls it down
+AO                                | Scalar          | 1.0     | Constant; object occlusion = mesh-baked
 **Finish**                        |                 |         |
-Finish RMA                        | Texture (Masks) | T_Finish_Polished_RMA | R=rough, G=metal, B=AO
-Roughness Min                     | Scalar          | 0.05    | Remap low end — the "finish dial"
-Roughness Max                     | Scalar          | 0.15    | Remap high end
+Use Roughness Map                 | StaticSwitch    | false   | OFF = flat `Roughness` scalar (polished/satin/matte)
+Roughness                         | Scalar          | 0.08    | Used when map is OFF — the whole finish for smooth metals
+Finish Roughness                  | Texture (Gray)  | T_Finish_Brushed_R | Single-channel; used when map is ON
+Roughness Min                     | Scalar          | 0.05    | Remap low end — the "finish dial" (map ON)
+Roughness Max                     | Scalar          | 0.15    | Remap high end (map ON)
 Use Finish Normal                 | StaticSwitch    | false   | OFF = flat normal (polished/satin/matte)
 Finish Normal                     | Texture (Normal)| T_Finish_Brushed_N | Brushed / hammered / etc.
 Normal Strength                   | Scalar          | 1.0     | FlattenNormal lerp
@@ -55,7 +69,7 @@ Use Anisotropy                    | StaticSwitch    | false   | ON for brushed f
 Anisotropy Strength               | Scalar          | 0.6     | 0–1, drives the Anisotropy output pin
 **Aging**                         |                 |         |
 Use Aging                         | StaticSwitch    | false   | Gates the whole patina layer
-Aging Mask                        | Texture (Masks) | Grunge_Dirt_1 | From curated /ArchVault/Textures/Alphas
+Aging Mask                        | Texture (Gray)  | Grunge_Dirt_1 | From curated /ArchVault/Textures/Alphas
 Aging Amount                      | Scalar          | 0.5     | Master intensity for the layer
 Aged Tint                         | Vector          | dark brown | Target color where mask is white
 Aged Roughness                    | Scalar          | 0.65    | Roughness where mask is white
@@ -72,14 +86,16 @@ Lit**, and wire:
 
 1. **UVs** — `MF_AdvancedUV` output feeds every texture sample (same pattern
    as `M_Opaque_Master`).
-2. **Roughness** — sample `Finish RMA`, take **R**, then
-   `Lerp(Roughness Min, Roughness Max, R)`. That Lerp output is the base
-   roughness. (This remap is what turns one shared map into every finish
-   level: polished = 0.05–0.12 band, matte = 0.35–0.55, etc.)
-3. **AO** — same sample, **B** channel → Ambient Occlusion pin (add an
-   `AO Intensity` lerp splice if you want parity with the opaque master).
-4. **Metallic** — `Metallic` scalar param (do NOT route the G channel by
-   default; metals are metallic=1 and the scalar keeps instances trivial).
+2. **Roughness** — `StaticSwitch(Use Roughness Map)`:
+   - false → `Roughness` scalar directly (polished/satin/matte are uniform, no
+     map or sample needed). This is the base roughness.
+   - true → sample single-channel `Finish Roughness`, then
+     `Lerp(Roughness Min, Roughness Max, sample)`. The remap turns one shared
+     grayscale map into every finish level (brushed = 0.20–0.45, etc.).
+3. **AO** — `AO` scalar param → Ambient Occlusion pin. Leave at 1.0; real
+   object occlusion comes from the mesh's baked AO, not this tiling material.
+4. **Metallic** — `Metallic` scalar param (1.0). Metals are metallic; the
+   scalar keeps instances trivial and the aging layer drops it where needed.
 5. **BaseColor** — `Metal Tint` vector param. Nothing else for clean metal.
 6. **Finish Normal** — `StaticSwitch(Use Finish Normal)`:
    - true → sample `Finish Normal`, then FlattenNormal: `Lerp(float3(0,0,1),
@@ -98,26 +114,28 @@ Lit**, and wire:
    Same construction as the opaque master's Dirt/Grunge layer, so it will
    feel familiar in the graph.
 
-Sampler budget: 3 texture samples worst-case (RMA, finish normal, aging
-mask), 1 when polished (RMA only). The current unpacked MI_Metal uses 5+.
+Sampler budget: 3 texture samples worst-case (finish roughness, finish normal,
+aging mask), **0 when polished/satin/matte** (all-scalar path — no samples at
+all). The current unpacked MI_Metal uses 5+.
 
 ---
 
 ## 4. Shared finish library — `/ArchVault/Textures/Metals/Finishes/`
 
-Metal-agnostic, seamless-tiling, ~2K. Shay authors the packed RMA maps
-(R=finish roughness variation, G=white, B=AO or white). Target set (~10 maps
-serve every metal):
+Metal-agnostic, seamless-tiling, ~2K. Shay authors single-channel grayscale
+roughness maps (no packing). Polished/satin/matte need **no map at all** — they
+run the scalar path. Target set is tiny — ~5 maps serve every metal:
 
-| Asset                    | Type   | Used by                          |
-|--------------------------|--------|----------------------------------|
-| T_Finish_Polished_RMA    | Masks  | Polished / Satin / Matte (remap does the work) |
-| T_Finish_Brushed_RMA     | Masks  | Brushed (directional roughness streaks) |
-| T_Finish_Brushed_N       | Normal | Brushed                          |
-| T_Finish_Hammered_N      | Normal | Hammered                         |
-| T_Finish_Hammered_RMA    | Masks  | Hammered (dimple AO in B)        |
-| T_Finish_Worn_RMA        | Masks  | Aged / Vintage / Oil-Rubbed base |
-| Aging masks              | Masks  | Reuse curated `/ArchVault/Textures/Alphas` grunges — do **not** duplicate them here |
+| Asset                 | Type   | Used by                          |
+|-----------------------|--------|----------------------------------|
+| T_Finish_Brushed_R    | Gray   | Brushed (directional roughness streaks) |
+| T_Finish_Brushed_N    | Normal | Brushed                          |
+| T_Finish_Hammered_R   | Gray   | Hammered (roughness variation over dimples) |
+| T_Finish_Hammered_N   | Normal | Hammered                         |
+| T_Finish_Worn_R       | Gray   | Aged / Vintage / Oil-Rubbed base |
+| Aging masks           | Gray   | Reuse curated `/ArchVault/Textures/Alphas` grunges — do **not** duplicate them here |
+
+(Polished / Satin / Matte: no texture — `Use Roughness Map` OFF, `Roughness` scalar.)
 
 Existing per-metal folders (`Brass/`, `Brass_Polished_4K/`, `Bronze_Clean_2K/`,
 `Gold_Shiny/`, `Steek_Plain/`, `Iron_Raw/`) are retired once instances are
@@ -144,16 +162,19 @@ there and re-run the builder rather than editing instances by hand.
 
 ## 6. Finish recipes
 
-| Finish     | Rough Min–Max | Finish Normal | Aniso | Aging | Notes |
-|------------|---------------|---------------|-------|-------|-------|
-| Polished   | 0.04 – 0.12   | off           | off   | off   | Mirror-adjacent; the default |
-| Satin      | 0.15 – 0.30   | off           | off   | off   | Newport Brass "satin" line |
-| Matte      | 0.35 – 0.55   | off           | off   | off   | |
-| Brushed    | 0.20 – 0.45   | Brushed_N     | ON 0.6| off   | The D5-parity finish |
-| Hammered   | 0.15 – 0.35   | Hammered_N    | off   | off   | Normal strength ~1.0 |
-| Aged       | 0.25 – 0.55   | off           | off   | ON 0.5| Worn_RMA + grunge mask |
-| Vintage    | 0.30 – 0.60   | Brushed_N 0.4 | off   | ON 0.65| Softer brushing + heavier aging |
-| OilRubbed  | 0.40 – 0.65   | off           | off   | ON 0.85| Aged Tint very dark brown (0.04, 0.03, 0.02); the classic ORB look |
+Roughness column: a single value = scalar path (`Use Roughness Map` OFF); a
+band = map path (grayscale `*_R` map remapped by Min/Max).
+
+| Finish     | Roughness      | Rough Map     | Finish Normal | Aniso | Aging | Notes |
+|------------|----------------|---------------|---------------|-------|-------|-------|
+| Polished   | 0.08 (scalar)  | —             | off           | off   | off   | Mirror-adjacent; the default |
+| Satin      | 0.22 (scalar)  | —             | off           | off   | off   | Newport Brass "satin" line |
+| Matte      | 0.45 (scalar)  | —             | off           | off   | off   | |
+| Brushed    | 0.20 – 0.45    | Brushed_R     | Brushed_N     | ON 0.6| off   | The D5-parity finish |
+| Hammered   | 0.15 – 0.35    | Hammered_R    | Hammered_N    | off   | off   | Normal strength ~1.0 |
+| Aged       | 0.25 – 0.55    | Worn_R        | off           | off   | ON 0.5| Worn_R + grunge mask |
+| Vintage    | 0.30 – 0.60    | Worn_R        | Brushed_N 0.4 | off   | ON 0.65| Softer brushing + heavier aging |
+| OilRubbed  | 0.40 – 0.65    | Worn_R        | off           | off   | ON 0.85| Aged Tint very dark brown (0.04, 0.03, 0.02); the classic ORB look |
 
 Instance hierarchy (built by `archvault_metals.py`):
 
@@ -197,11 +218,19 @@ Cleanup order (matters — references first, deletion last):
    only when their referencer count is zero.
 5. Push via the ArchVault menu; other machines Pull.
 
-## 8. Authoring packed RMA maps (for Shay)
+## 8. Authoring roughness maps (for Shay)
 
-- Photoshop/Substance: place grayscale roughness in **R**, flat white in **G**,
-  AO (or white) in **B**. Export PNG/TGA, no alpha needed.
+You only need ~3 maps: `T_Finish_Brushed_R`, `T_Finish_Hammered_R`,
+`T_Finish_Worn_R`. Polished/satin/matte need none.
+
+- **Single-channel grayscale.** Just the roughness variation — no packing, no
+  metallic channel, no AO channel. Export a grayscale PNG/TGA (or put it in one
+  channel; the importer sets Grayscale compression + sRGB off).
+- Bright = rougher, dark = smoother. The master's Min/Max remaps it into each
+  finish's band, so author the *pattern* (streak direction, dimple falloff),
+  not absolute values.
 - Seamless tiling is non-negotiable for finish maps (they repeat on hardware).
-- Don't bake metal color into finish maps — color comes from `Metal Tint`.
-- Gloss maps are just inverted roughness: invert once during packing, then
+- Don't bake metal color or metallic/AO into these — color comes from
+  `Metal Tint`, metallic/AO are scalars.
+- Gloss maps are just inverted roughness: invert once, save as the `_R` map,
   delete the Gloss source. Never ship both.
