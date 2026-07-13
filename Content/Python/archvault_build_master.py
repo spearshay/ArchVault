@@ -26,7 +26,7 @@ import unreal
 MASTER_PATH = "/ArchVault/Masters/M_Metal_Master"
 MASTER_NAME = "M_Metal_Master"
 MASTER_DIR = "/ArchVault/Masters"
-MF_ADVANCED_UV = "/ArchVault/Functions/MF_AdvancedUV"
+MF_UV_CONTROL = "/ArchVault/Functions/MF_UVControl"  # same UV control as M_Opaque_Master
 
 # Parameter names — keep identical to archvault_metals.py.
 P_TINT = "Metal Tint"
@@ -297,17 +297,22 @@ def build(force=False):
     except Exception as e:
         unreal.log_warning("Anisotropy pin not available (%s) — skip; wire manually." % e)
 
-    # ---- UVs via MF_AdvancedUV (best effort) ----
-    if _EAL.does_asset_exist(MF_ADVANCED_UV):
-        try:
-            uv = _node(mat, unreal.MaterialExpressionMaterialFunctionCall, -2000, 300)
-            uv.set_editor_property("material_function", _EAL.load_asset(MF_ADVANCED_UV))
-            for samp in (rough_tex, normal_tex, aging_mask):
-                _wire(uv, "", samp, "UVs")
-        except Exception as e:
-            unreal.log_warning("MF_AdvancedUV hookup skipped (%s) — samplers use default UVs." % e)
+    # ---- UVs via MF_UVControl (Tiling / Offset / Rotation + per-instance random) ----
+    # Same UV control as M_Opaque_Master. The call node feeds every sampler's UVs input;
+    # its params (UV Scale U/V, UV Offset U/V, UV Rotation, ...) are promoted onto the
+    # master and become overridable per instance — that's the "UV controls" surface.
+    if _EAL.does_asset_exist(MF_UV_CONTROL):
+        uv = _node(mat, unreal.MaterialExpressionMaterialFunctionCall, -2200, 300)
+        uv.set_editor_property("material_function", _EAL.load_asset(MF_UV_CONTROL))
+        for samp in (rough_tex, normal_tex, aging_mask):
+            # MF output pin name varies by function; keep the first candidate that connects.
+            # connect_material_expressions returns False (doesn't raise) on a wrong output name.
+            if not any(_MEL.connect_material_expressions(uv, out, samp, "UVs")
+                       for out in ("", "Result", "UV", "UVs", "Output")):
+                unreal.log_warning("MF_UVControl -> %s UVs failed (no matching output pin)"
+                                   % samp.get_name())
     else:
-        unreal.log_warning("MF_AdvancedUV not found — samplers use default UVs.")
+        unreal.log_warning("MF_UVControl not found — samplers use default UVs.")
 
     # ---- finalize ----
     try:

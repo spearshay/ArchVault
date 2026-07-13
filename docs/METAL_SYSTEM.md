@@ -90,8 +90,8 @@ that script constructs (and for hand-tweaks afterward).
 Create `Material'/ArchVault/Masters/M_Metal_Master'`, Shading Model **Default
 Lit**, and wire:
 
-1. **UVs** — `MF_AdvancedUV` output feeds every texture sample (same pattern
-   as `M_Opaque_Master`).
+1. **UVs** — `MF_UVControl` output feeds every texture sample (same UV control
+   as `M_Opaque_Master`: UV Scale U/V, Offset U/V, Rotation + per-instance random).
 2. **Roughness** — `StaticSwitch(Use Roughness Map)`:
    - false → `Roughness` scalar directly (polished/satin/matte are uniform, no
      map or sample needed). This is the base roughness.
