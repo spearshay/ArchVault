@@ -58,8 +58,11 @@ _MEL = unreal.MaterialEditingLibrary
 _EAL = unreal.EditorAssetLibrary
 
 # Engine fallback textures so texture-sample params compile before instances
-# override them. First existing wins.
+# override them. First existing wins. Gray samplers are Linear Grayscale, which rejects
+# an sRGB color default (WhiteSquareTexture) in every permutation that samples it -> the
+# ArchVault-shipped linear grayscale white comes first.
 _GRAY_CANDIDATES = [
+    "/ArchVault/Textures/T_White_Linear.T_White_Linear",
     "/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture",
     "/Engine/EngineResources/DefaultTexture.DefaultTexture",
 ]

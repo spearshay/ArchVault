@@ -43,8 +43,20 @@ def _dialog(title, message):
         unreal.log("%s: %s" % (title, message))
 
 
+# ArchVault is authored in UE 5.6 (matches Gustavo, 2026-10). An asset saved by a newer engine can't be opened by
+# an older one, so a push from 5.7/5.8 would silently break the library for every 5.6 user.
+AUTHORING_VERSION = "5.6"
+
+
 def push():
     """Stage everything, auto-commit if there are changes, and push to GitHub."""
+    ver = unreal.SystemLibrary.get_engine_version()
+    if not ver.startswith(AUTHORING_VERSION + "."):
+        _dialog("ArchVault — Push blocked",
+                "ArchVault is authored in UE %s; this editor is %s.\n\nAssets saved here can't be opened by %s. "
+                "Make the change in %s and push from there." % (AUTHORING_VERSION, ver.split("-")[0],
+                                                                AUTHORING_VERSION, AUTHORING_VERSION))
+        return
     unreal.log("ArchVault: push starting (" + _repo() + ")")
     _git(["add", "-A"])
     changed = _git(["status", "--porcelain"]).stdout.strip()

@@ -16,7 +16,7 @@ Content/
 
 ### Prerequisites (one time per machine)
 
-- **Unreal Engine 5.7** (or newer).
+- **Unreal Engine 5.6** (or newer).
 - **Git** and **Git LFS**. After installing Git LFS, run it once:
   ```bash
   git lfs install
@@ -43,7 +43,7 @@ Copy the `ArchVault` plugin folder into `<YourProject>/Plugins/ArchVault`. Make 
 
 ## Sharing with others
 
-ArchVault is a self-contained, content-only plugin — it works in any UE 5.7+ project on any machine, for you or anyone else. To share it:
+ArchVault is a self-contained, content-only plugin — it works in any UE 5.6+ project on any machine, for you or anyone else. To share it:
 
 - **With repo access:** they clone it exactly as in Option A (needs read access to `spearshay/archvault`).
 - **Without git:** zip the `ArchVault` folder (with real LFS assets pulled down) and send it; they drop it into `Plugins/`.
@@ -73,4 +73,6 @@ Binary assets are tracked with **Git LFS** (see `.gitattributes`). Because UE as
 
 ## Engine
 
-Built for Unreal Engine 5.7.
+Authored in Unreal Engine 5.6 (ported from 5.7 in Oct 2026; the last 5.7-saved state is tag `pre-5.6-port`).
+Assets saved in 5.6 open in 5.7/5.8, but an asset saved by a newer engine can't be opened by 5.6 — so edit and
+push ArchVault from 5.6 only. The ArchVault → Push menu item refuses to run in any other version.
