@@ -43,9 +43,9 @@ def _dialog(title, message):
         unreal.log("%s: %s" % (title, message))
 
 
-# ArchVault is authored in UE 5.6 (matches Gustavo, 2026-10). An asset saved by a newer engine can't be opened by
-# an older one, so a push from 5.7/5.8 would silently break the library for every 5.6 user.
-AUTHORING_VERSION = "5.6"
+# ArchVault is authored in UE 5.8 (team moved to 5.8, 2026-11-05; last 5.6-saved state = tag `last-5.6`).
+# An asset saved by a newer engine can't be opened by an older one, so pushes from any other version are blocked.
+AUTHORING_VERSION = "5.8"
 
 
 def push():
