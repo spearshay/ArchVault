@@ -62,7 +62,7 @@ _EAL = unreal.EditorAssetLibrary
 # an sRGB color default (WhiteSquareTexture) in every permutation that samples it -> the
 # ArchVault-shipped linear grayscale white comes first.
 _GRAY_CANDIDATES = [
-    "/ArchVault/Textures/T_White_Linear.T_White_Linear",
+    "/ArchVault/Textures/Defaults/T_White_Linear.T_White_Linear",
     "/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture",
     "/Engine/EngineResources/DefaultTexture.DefaultTexture",
 ]
