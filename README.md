@@ -52,17 +52,27 @@ This project is released under the **MIT License** (see [`LICENSE`](LICENSE)), s
 
 ## Metals workflow
 
-Metals use a dedicated master (`M_Metal_Master`) with a shared, metal-agnostic
-finish library — any metal × finish combo (polished, brushed, aged, oil-rubbed,
-…) comes from tints + ~5 shared grayscale maps (metallic/AO are scalars, not
-packed), not per-combination texture sets. Full build spec and workflow:
-[`docs/METAL_SYSTEM.md`](docs/METAL_SYSTEM.md).
+Metals are instances of `M_Opaque_Master` (since Nov 2026; the dedicated
+`M_Metal_Master` was retired once the opaque master gained anisotropy and a
+roughness remap):
 
-- `Content/Python/archvault_build_master.py` — `build()` constructs the whole
-  `M_Metal_Master` graph in code (clean rebuild), so you don't hand-wire it.
-- `Content/Python/archvault_metals.py` — builds the `MI_Metal_Base → MI_<Metal>
-  → MI_<Metal>_<Finish>` instance hierarchy from `metal_manifest.json`. Edit the
-  manifest, re-run `archvault_metals.build()`; don't hand-edit instances.
+- `Instances/Metal/MI_Metal_<Metal>` — one parent per metal: `Base Color` =
+  measured linear tint, `Metallic Value` 1. Change the colour here and every
+  finish follows.
+- `MI_Metal_<Metal>_<Finish>` — roughness per finish; Brushed turns on
+  `Use Anisotropy`; Aged / Vintage / OilRubbed darken the colour and raise
+  roughness (uniform — no wear mask yet).
+- Tuned one-offs sit alongside (e.g. `MI_Metal_MatteBlack`,
+  `MI_Metal_Brizo_BlackOnyx`). `Roughness Min` / `Roughness Max` set the range a
+  roughness map covers.
+- Don't rename or remove `M_Opaque_Master` parameters — instance overrides on a
+  renamed/removed parameter are dropped silently. Adding parameters is safe.
+
+Legacy: `archvault_build_master.py`, `archvault_metals.py`,
+`metal_manifest.json` and [`docs/METAL_SYSTEM.md`](docs/METAL_SYSTEM.md) belong
+to the retired `M_Metal_Master` and no longer have assets to build against —
+don't run them.
+
 - `Content/Python/archvault_audit.py` — read-only library audit
   (`archvault_audit.report()`): duplicate alphas, redundant maps, orphans; with
   reference-safe fix/delete helpers.
