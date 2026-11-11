@@ -68,11 +68,6 @@ roughness remap):
 - Don't rename or remove `M_Opaque_Master` parameters — instance overrides on a
   renamed/removed parameter are dropped silently. Adding parameters is safe.
 
-Legacy: `archvault_build_master.py`, `archvault_metals.py`,
-`metal_manifest.json` and [`docs/METAL_SYSTEM.md`](docs/METAL_SYSTEM.md) belong
-to the retired `M_Metal_Master` and no longer have assets to build against —
-don't run them.
-
 - `Content/Python/archvault_audit.py` — read-only library audit
   (`archvault_audit.report()`): duplicate alphas, redundant maps, orphans; with
   reference-safe fix/delete helpers.

@@ -12,8 +12,6 @@ Usage (UE Python console, editor open):
     archvault_audit.fix_duplicate_alphas()         # dry-run merge plan
     archvault_audit.fix_duplicate_alphas(apply=True)
     archvault_audit.delete_unreferenced(["/ArchVault/Textures/Metals/Gold_Shiny"], apply=True)
-
-See docs/METAL_SYSTEM.md §7 for where this fits in the cleanup order.
 """
 import unreal
 
