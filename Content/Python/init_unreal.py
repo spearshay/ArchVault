@@ -47,6 +47,16 @@ def _build_menu():
         "import archvault_menu; archvault_menu.open_master()")
     sub.add_menu_entry("ArchVault", master)
 
+    fill = unreal.ToolMenuEntry(name="ArchVault_FillMI",
+                                type=unreal.MultiBlockType.MENU_ENTRY)
+    fill.set_label("Fill MI from Textures")
+    fill.set_tool_tip("Select ONE material instance + its textures (or their folder) in the "
+                      "Content Browser: fills the maps, ticks switches + overrides, fixes sRGB")
+    fill.set_string_command(
+        unreal.ToolMenuStringCommandType.PYTHON, "",
+        "import mi_fill_from_textures; mi_fill_from_textures.run()")
+    sub.add_menu_entry("Materials", fill)
+
     push = unreal.ToolMenuEntry(name="ArchVault_Push",
                                 type=unreal.MultiBlockType.MENU_ENTRY)
     push.set_label("Push to GitHub  (commit + push)")
