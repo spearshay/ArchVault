@@ -11,9 +11,11 @@ What it does:
 - Reads the MI's texture params + static switches LIVE from its parent and fills only the ones
   that exist (PARAMS below), ticking the matching "Use ..." switches. The setters create the
   override entry, so exactly the params it sets get their override box ticked - nothing else.
+- OpenGL normals (name says GL / OGL / OpenGL right after the normal token, e.g. Brick_Normal_GL_2K,
+  nrm-ogl, NormalOpenGL) -> ticks Flip Green Channel on the texture (only ever ticks it, never unticks).
 - Flags instead of guessing: GLOSS (needs inverting), ORM/ARM packs (channel order is not the
   master's RMA), REFL (spec/gloss reflectance, not UE Specular), Height/Displacement (no slot),
-  OpenGL normals (need Flip Green), two textures for one slot.
+  a DirectX-named normal that is already flipped, two textures for one slot.
 - Saves the MI + any texture whose settings changed; refreshes an open MI editor.
 
 Canonical copy: E:\\My Drive\\AI\\Claude\\UE\\mi_swap\\mi_fill_from_textures.py
@@ -62,29 +64,48 @@ PARAMS = {
 }
 _LOOKUP = {s: slot for slot, sfx in SUFFIXES.items() for s in sfx}
 _RES = re.compile(r"^(\d+k|\d+)$")  # resolution / index tokens: 2K, 4K, 001
+# normal-map convention markers; only honoured right after the normal token (or fused onto it)
+GL_MARKS = ("opengl", "ogl", "gl")
+DX_MARKS = ("directx", "dx")
 
 
 def classify(name):
-    """Return (slot | None, flag_message | None, is_gl) for a texture asset name."""
+    """Return (slot | None, flag_message | None, convention) for a texture asset name.
+    convention = "gl" / "dx" for a normal map whose name says so, else None."""
     toks = [t.lower() for t in re.split(r"[_\-\s.]+", name) if t]
-    while toks and _RES.match(toks[-1]):
-        toks.pop()
+    conv = None
+    while toks:  # strip trailing resolution/index tokens and ONE convention marker, in any order
+        if _RES.match(toks[-1]):
+            toks.pop()
+        elif conv is None and toks[-1] in GL_MARKS + DX_MARKS:
+            conv = "gl" if toks.pop() in GL_MARKS else "dx"
+        else:
+            break
     cands = ["".join(toks[-2:])] if len(toks) >= 2 else []
     cands += toks[-1:]
     for c in cands:
         if c in FLAGS:
-            return None, FLAGS[c], False
+            return None, FLAGS[c], None
         if c in _LOOKUP:
-            return _LOOKUP[c], None, c.endswith("gl")
-    return None, None, False
+            slot = _LOOKUP[c]
+            if slot != "normal":
+                return slot, None, None
+            if conv is None:  # fused marker already in SUFFIXES: NormalGL, NrmGL, NormalDX
+                conv = "gl" if c.endswith(GL_MARKS) else "dx" if c.endswith(DX_MARKS) else None
+            return slot, None, conv
+        for b in SUFFIXES["normal"]:  # fused marker on a plain normal token not in the list
+            for m in GL_MARKS + DX_MARKS:
+                if c == b + m:
+                    return "normal", None, "gl" if m in GL_MARKS else "dx"
+    return None, None, None
 
 
 def _pkg(o):
     return o.get_path_name().split(".")[0]
 
 
-def _fix_texture(tex, slot, res):
-    """sRGB/compression by slot. Returns True if changed.
+def _fix_texture(tex, slot, res, conv=None):
+    """sRGB/compression by slot (+ Flip Green for OpenGL-named normals). Returns True if changed.
     Compression goes FIRST: UE forces sRGB off while compression is Masks/Normalmap/etc., so an
     sRGB set before the compression change gets undone (seen in 5.8 test, 2026-11-10)."""
     tc = unreal.TextureCompressionSettings
@@ -105,6 +126,13 @@ def _fix_texture(tex, slot, res):
         changes.append("sRGB %s" % ("on" if want_srgb else "off"))
     if tex.get_editor_property("srgb") != want_srgb:
         res["errors"].append("%s: sRGB would not change to %s" % (tex.get_name(), want_srgb))
+    if slot == "normal":
+        flipped = tex.get_editor_property("flip_green_channel")
+        if conv == "gl" and not flipped:
+            tex.set_editor_property("flip_green_channel", True)
+            changes.append("Flip Green Channel on (OpenGL name)")
+        elif conv == "dx" and flipped:
+            res["flags"].append("%s: name says DirectX but Flip Green Channel is ticked - check it" % tex.get_name())
     if changes:
         res["textures_changed"].append("%s: %s" % (tex.get_name(), ", ".join(changes)))
     return bool(changes)
@@ -129,34 +157,32 @@ def fill(mi, textures, save=True):
             res["errors"].append("%s is in /ArchVault - a /Game MI must not reference the library; "
                                  "copy it into the project first. Skipped." % t.get_name())
             continue
-        slot, flag, is_gl = classify(t.get_name())
+        slot, flag, conv = classify(t.get_name())
         if flag:
             res["flags"].append("%s: %s" % (t.get_name(), flag))
         elif slot:
-            slots.setdefault(slot, []).append((t, is_gl))
+            slots.setdefault(slot, []).append((t, conv))
         else:
             res["unmatched"].append(t.get_name())
 
     # 2. one texture per slot (prefer DirectX over OpenGL normals), else flag
     for slot, lst in sorted(slots.items()):
         if len(lst) > 1:
-            dx = [x for x in lst if not x[1]]
+            dx = [x for x in lst if x[1] != "gl"]
             if slot == "normal" and len(dx) == 1:
                 lst = dx
             else:
                 res["flags"].append("%s: %d textures (%s) - pick one by hand, not assigned" % (
                     slot, len(lst), ", ".join(x[0].get_name() for x in lst)))
                 continue
-        tex, is_gl = lst[0]
+        tex, conv = lst[0]
         names, switches = PARAMS[slot]
         param = next((n for n in names if n in tex_params), None)
         if not param:
             res["flags"].append("%s: %s - parent has no %s param (looked for %s), not assigned" % (
                 slot, tex.get_name(), slot, "/".join(names)))
             continue
-        if is_gl:
-            res["flags"].append("%s: OpenGL normal - tick Flip Green Channel on the texture" % tex.get_name())
-        changed = _fix_texture(tex, slot, res)
+        changed = _fix_texture(tex, slot, res, conv)
         if changed and save:
             eal.save_loaded_asset(tex, False)
         mel.set_material_instance_texture_parameter_value(mi, param, tex)
