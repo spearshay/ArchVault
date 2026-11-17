@@ -13,8 +13,8 @@ What it does:
   override entry, so exactly the params it sets get their override box ticked - nothing else.
 - OpenGL normals (name says GL / OGL / OpenGL right after the normal token, e.g. Brick_Normal_GL_2K,
   nrm-ogl, NormalOpenGL) -> ticks Flip Green Channel on the texture (only ever ticks it, never unticks).
-- ORM / ARM packs (R=AO G=Rough B=Metal, Poliigon/glTF) -> "ORM Map" + Use Packed ORM and the three
-  channel switches (master is ORM since 2026-11-17).
+- ORM / ARM packs (R=AO G=Rough B=Metal, Poliigon/glTF) -> "ORM Map" + Use Packed ORM, which on its
+  own drives all three channels (master is ORM since 2026-11-17).
 - Flags instead of guessing: GLOSS (needs inverting), RMA packs (channel order is not the
   master's ORM), REFL (spec/gloss reflectance, not UE Specular), Height/Displacement (no slot),
   a DirectX-named normal that is already flipped, two textures for one slot.
@@ -60,8 +60,8 @@ PARAMS = {
     "metallic": (["Metallic"], ["Use Metallic Mask"]),
     "ao": (["Ambient Occlusion"], ["Use AO Mask"]),
     "specular": (["Specular"], ["Use Specular Map"]),
-    # packed AO/roughness/metal still need their own switches ON (M_Opaque_Master wiring)
-    "orm": (["ORM Map"], ["Use Packed ORM", "Use Roughness Map", "Use Metallic Mask", "Use AO Mask"]),
+    # Use Packed ORM alone drives AO/roughness/metal (output-side switches in M_Opaque_Master since 2026-11-17)
+    "orm": (["ORM Map"], ["Use Packed ORM"]),
 }
 _LOOKUP = {s: slot for slot, sfx in SUFFIXES.items() for s in sfx}
 _RES = re.compile(r"^(\d+k|\d+)$")  # resolution / index tokens: 2K, 4K, 001
