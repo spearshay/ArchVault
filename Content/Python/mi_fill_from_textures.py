@@ -13,8 +13,10 @@ What it does:
   override entry, so exactly the params it sets get their override box ticked - nothing else.
 - OpenGL normals (name says GL / OGL / OpenGL right after the normal token, e.g. Brick_Normal_GL_2K,
   nrm-ogl, NormalOpenGL) -> ticks Flip Green Channel on the texture (only ever ticks it, never unticks).
-- Flags instead of guessing: GLOSS (needs inverting), ORM/ARM packs (channel order is not the
-  master's RMA), REFL (spec/gloss reflectance, not UE Specular), Height/Displacement (no slot),
+- ORM / ARM packs (R=AO G=Rough B=Metal, Poliigon/glTF) -> "ORM Map" + Use Packed ORM and the three
+  channel switches (master is ORM since 2026-11-17).
+- Flags instead of guessing: GLOSS (needs inverting), RMA packs (channel order is not the
+  master's ORM), REFL (spec/gloss reflectance, not UE Specular), Height/Displacement (no slot),
   a DirectX-named normal that is already flipped, two textures for one slot.
 - Saves the MI + any texture whose settings changed; refreshes an open MI editor.
 
@@ -35,14 +37,13 @@ SUFFIXES = {
     "metallic": ["metallic", "metalness", "basemetalness"],
     "ao": ["ambientocclusion", "ao", "occlusion"],
     "specular": ["specular", "spec"],
-    "rma": ["rma"],
+    "orm": ["orm", "arm"],
 }
 # matched but deliberately NOT assigned -> reported
 FLAGS = {
     "gloss": "GLOSS = glossiness (inverse of roughness) - needs inverting first, not assigned",
     "glossiness": "GLOSS = glossiness (inverse of roughness) - needs inverting first, not assigned",
-    "orm": "ORM pack (R=AO G=Rough B=Metal) - master RMA is R=Rough G=Metal B=AO; repack, not assigned",
-    "arm": "ARM pack (R=AO G=Rough B=Metal) - master RMA is R=Rough G=Metal B=AO; repack, not assigned",
+    "rma": "RMA pack (R=Rough G=Metal B=AO) - master ORM Map is R=AO G=Rough B=Metal; repack, not assigned",
     "refl": "REFL = spec/gloss reflectance (F0), not UE Specular (0.5 = 4%) - not assigned",
     "reflection": "REFL = spec/gloss reflectance (F0), not UE Specular (0.5 = 4%) - not assigned",
     "height": "Height - no slot on the master, skipped",
@@ -59,8 +60,8 @@ PARAMS = {
     "metallic": (["Metallic"], ["Use Metallic Mask"]),
     "ao": (["Ambient Occlusion"], ["Use AO Mask"]),
     "specular": (["Specular"], ["Use Specular Map"]),
-    # packed roughness/metal/AO still need their own switches ON (M_Opaque_Master wiring)
-    "rma": (["RMA_Map"], ["Use Packed RMA", "Use Roughness Map", "Use Metallic Mask", "Use AO Mask"]),
+    # packed AO/roughness/metal still need their own switches ON (M_Opaque_Master wiring)
+    "orm": (["ORM Map"], ["Use Packed ORM", "Use Roughness Map", "Use Metallic Mask", "Use AO Mask"]),
 }
 _LOOKUP = {s: slot for slot, sfx in SUFFIXES.items() for s in sfx}
 _RES = re.compile(r"^(\d+k|\d+)$")  # resolution / index tokens: 2K, 4K, 001
