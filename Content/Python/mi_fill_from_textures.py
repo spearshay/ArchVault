@@ -20,6 +20,10 @@ What it does:
   a DirectX-named normal that is already flipped, two textures for one slot.
 - Saves the MI + any texture whose settings changed; refreshes an open MI editor.
 
+Check MI Texture Settings (second menu entry, check_run): select MIs or a folder of them; every texture
+an MI overrides is matched to the master's sampler for that slot (Color = sRGB on, Linear = sRGB off,
+Normal = Normalmap, Grayscale/Masks likewise) and fixed + saved. Catches maps dropped on by hand.
+
 Canonical copy: E:\\My Drive\\AI\\Claude\\UE\\mi_swap\\mi_fill_from_textures.py
 Deployed copy:  <UE_5.8>\\Engine\\Plugins\\ArchVault\\Content\\Python\\ (menu in init_unreal.py)
 """
@@ -201,12 +205,30 @@ def fill(mi, textures, save=True):
     return res
 
 
+def _selected_folders():
+    """Selected Content Browser folders as real asset paths. The browser reports VIRTUAL paths
+    (/All/Game/X, /All/EngineData/Plugins/ArchVault/X, /All/Plugins/...), so take the shortest tail that
+    is an existing asset directory: /Game/X, /ArchVault/X."""
+    eul = unreal.EditorUtilityLibrary
+    virtual = list(eul.get_selected_folder_paths())
+    if hasattr(eul, "get_selected_path_view_folder_paths"):  # folders picked in the left-hand tree
+        virtual += [p for p in eul.get_selected_path_view_folder_paths() if p not in virtual]
+    out = []
+    for v in virtual:
+        segs = [s for s in str(v).split("/") if s]
+        real = next(("/" + "/".join(segs[i:]) for i in range(len(segs))
+                     if eal.does_directory_exist("/" + "/".join(segs[i:]))), None)
+        if real and real not in out:
+            out.append(real)
+    unreal.log("ArchVault selection: folders %s -> %s" % (virtual, out))
+    return out
+
+
 def _textures_from_selection(assets):
     texs = [a for a in assets if isinstance(a, unreal.Texture2D)]
     if texs:
         return texs
-    for folder in unreal.EditorUtilityLibrary.get_selected_folder_paths():
-        folder = folder[4:] if folder.startswith("/All/") else folder
+    for folder in _selected_folders():
         for p in eal.list_assets(folder, recursive=True, include_folder=False):
             a = unreal.load_asset(p.split(".")[0])
             if isinstance(a, unreal.Texture2D):
@@ -225,6 +247,95 @@ def report_text(res):
     if not res["set"]:
         lines.append("\nNothing was filled.")
     return "\n".join(lines)
+
+
+# ---- Check MI Texture Settings: fix any texture an MI uses whose sRGB/compression doesn't match the
+# master's sampler for that slot (catches maps dropped on by hand, which skip _fix_texture). ----
+_TC = unreal.TextureCompressionSettings
+# sampler type name -> (compressions accepted as-is, compression to set otherwise, sRGB)
+_SAMPLER_WANTS = {
+    "SAMPLERTYPE_COLOR": ((_TC.TC_DEFAULT, _TC.TC_BC7), _TC.TC_DEFAULT, True),
+    "SAMPLERTYPE_LINEAR_COLOR": ((_TC.TC_DEFAULT, _TC.TC_BC7), _TC.TC_DEFAULT, False),
+    "SAMPLERTYPE_NORMAL": ((_TC.TC_NORMALMAP,), _TC.TC_NORMALMAP, False),
+    "SAMPLERTYPE_GRAYSCALE": ((_TC.TC_GRAYSCALE,), _TC.TC_GRAYSCALE, True),
+    "SAMPLERTYPE_LINEAR_GRAYSCALE": ((_TC.TC_GRAYSCALE,), _TC.TC_GRAYSCALE, False),
+    "SAMPLERTYPE_MASKS": ((_TC.TC_MASKS,), _TC.TC_MASKS, False),
+}
+
+
+def _samplers(material):
+    """param name -> sampler type name, for every texture parameter node in the base material."""
+    out = {}
+    for e in unreal.ObjectIterator(unreal.MaterialExpressionTextureSampleParameter):
+        if e.get_outer() == material:
+            out[str(e.get_editor_property("parameter_name"))] = e.get_editor_property("sampler_type").name
+    return out
+
+
+def check_textures(mis, fix=True):
+    """For each MI's own texture overrides: make the texture match its slot's sampler. Returns a report dict."""
+    res = {"checked": 0, "textures_changed": [], "ok": 0, "flags": [], "errors": []}
+    cache, done = {}, set()
+    for mi in mis:
+        base = mi.get_base_material()
+        if not base:
+            res["errors"].append("%s: no base material" % mi.get_name())
+            continue
+        samp = cache.setdefault(_pkg(base), _samplers(base))
+        res["checked"] += 1
+        for tp in mi.get_editor_property("texture_parameter_values"):
+            name, tex = str(tp.parameter_info.name), tp.parameter_value
+            if not isinstance(tex, unreal.Texture2D) or name not in samp:
+                continue
+            key = (_pkg(tex), samp[name])
+            if key in done:
+                continue
+            done.add(key)
+            want = _SAMPLER_WANTS.get(samp[name])
+            if not want:
+                res["flags"].append("%s . %s: sampler %s not handled" % (mi.get_name(), name, samp[name]))
+                continue
+            ok_tc, set_tc, want_srgb = want
+            changes = []
+            if tex.get_editor_property("compression_settings") not in ok_tc:  # compression FIRST (see _fix_texture)
+                changes.append("Compression %s" % set_tc.name)
+                if fix: tex.set_editor_property("compression_settings", set_tc)
+            if tex.get_editor_property("srgb") != want_srgb:
+                changes.append("sRGB %s" % ("on" if want_srgb else "off"))
+                if fix: tex.set_editor_property("srgb", want_srgb)
+            if not changes:
+                res["ok"] += 1
+                continue
+            res["textures_changed"].append("%s (%s on %s): %s" % (tex.get_name(), name, mi.get_name(), ", ".join(changes)))
+            if fix:
+                if tex.get_editor_property("srgb") != want_srgb:
+                    res["errors"].append("%s: sRGB would not change to %s" % (tex.get_name(), want_srgb))
+                eal.save_loaded_asset(tex, False)
+    for mi in mis:  # textures changed -> refresh any open MI editor
+        mel.refresh_material_instance_editor(mi)
+    return res
+
+
+def check_run():
+    """Menu entry: selected MIs, or every MI under the selected folder(s)."""
+    assets = _selected()
+    mis = [a for a in assets if isinstance(a, unreal.MaterialInstanceConstant)]
+    if not mis:
+        for folder in _selected_folders():
+            for p in eal.list_assets(folder, recursive=True, include_folder=False):
+                a = unreal.load_asset(p.split(".")[0])
+                if isinstance(a, unreal.MaterialInstanceConstant):
+                    mis.append(a)
+    if not mis:
+        return _msg("Select material instances, or a folder of them, then click again.")
+    res = check_textures(mis)
+    lines = ["Checked %d material instance(s): %d texture(s) already right." % (res["checked"], res["ok"])]
+    for key, title in [("textures_changed", "Texture settings FIXED + saved"), ("flags", "FLAGGED"), ("errors", "Errors")]:
+        if res[key]:
+            lines += ["", title + ":"] + ["  " + x for x in res[key]]
+    if not res["textures_changed"]:
+        lines.append("Nothing needed fixing.")
+    _msg("\n".join(lines))
 
 
 _target = None  # MI remembered by a click with only the MI selected (two-click flow)

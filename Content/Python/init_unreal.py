@@ -57,6 +57,16 @@ def _build_menu():
         "import mi_fill_from_textures; mi_fill_from_textures.run()")
     sub.add_menu_entry("Materials", fill)
 
+    check = unreal.ToolMenuEntry(name="ArchVault_CheckMITextures",
+                                 type=unreal.MultiBlockType.MENU_ENTRY)
+    check.set_label("Check MI Texture Settings")
+    check.set_tool_tip("Select material instances (or a folder of them): fixes sRGB/compression on any "
+                       "texture that doesn't match its slot in the master (e.g. maps dropped on by hand)")
+    check.set_string_command(
+        unreal.ToolMenuStringCommandType.PYTHON, "",
+        "import importlib, mi_fill_from_textures; importlib.reload(mi_fill_from_textures); mi_fill_from_textures.check_run()")
+    sub.add_menu_entry("Materials", check)
+
     push = unreal.ToolMenuEntry(name="ArchVault_Push",
                                 type=unreal.MultiBlockType.MENU_ENTRY)
     push.set_label("Push to GitHub  (commit + push)")
