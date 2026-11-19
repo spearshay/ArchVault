@@ -13,6 +13,9 @@ What it does:
   override entry, so exactly the params it sets get their override box ticked - nothing else.
 - OpenGL normals (name says GL / OGL / OpenGL right after the normal token, e.g. Brick_Normal_GL_2K,
   nrm-ogl, NormalOpenGL) -> ticks Flip Green Channel on the texture (only ever ticks it, never unticks).
+  A normal whose name says NEITHER GL nor DX is assumed OpenGL too (Poliigon and most vendors ship GL;
+  16 of 17 measurable ArchVault normals were, 2026-11-19) - ticked, with a report line saying so.
+  DX-named normals are left alone. Given _Normal + _NormalDX, the DX one is used.
 - ORM / ARM packs (R=AO G=Rough B=Metal, Poliigon/glTF) -> "ORM Map" + Use Packed ORM, which on its
   own drives all three channels (master is ORM since 2026-11-17).
 - Flags instead of guessing: GLOSS (needs inverting), RMA packs (channel order is not the
@@ -79,6 +82,9 @@ def classify(name):
     convention = "gl" / "dx" for a normal map whose name says so, else None."""
     toks = [t.lower() for t in re.split(r"[_\-\s.]+", name) if t]
     conv = None
+    # Poliigon legacy names end in the WORKFLOW, not the map: Name_NRM_4K_METALNESS / _COL_4K_SPECULAR
+    if len(toks) >= 3 and toks[-1] in ("metalness", "specular") and _RES.match(toks[-2]):
+        toks.pop()
     while toks:  # strip trailing resolution/index tokens and ONE convention marker, in any order
         if _RES.match(toks[-1]):
             toks.pop()
@@ -138,6 +144,9 @@ def _fix_texture(tex, slot, res, conv=None):
         if conv == "gl" and not flipped:
             tex.set_editor_property("flip_green_channel", True)
             changes.append("Flip Green Channel on (OpenGL name)")
+        elif conv is None and not flipped:
+            tex.set_editor_property("flip_green_channel", True)
+            changes.append("Flip Green Channel on (no GL/DX in name - assumed OpenGL; untick if bumps read as dents)")
         elif conv == "dx" and flipped:
             res["flags"].append("%s: name says DirectX but Flip Green Channel is ticked - check it" % tex.get_name())
     if changes:
@@ -172,10 +181,10 @@ def fill(mi, textures, save=True):
         else:
             res["unmatched"].append(t.get_name())
 
-    # 2. one texture per slot (prefer DirectX over OpenGL normals), else flag
+    # 2. one texture per slot (prefer the DX-named normal; unmarked counts as OpenGL), else flag
     for slot, lst in sorted(slots.items()):
         if len(lst) > 1:
-            dx = [x for x in lst if x[1] != "gl"]
+            dx = [x for x in lst if x[1] == "dx"]
             if slot == "normal" and len(dx) == 1:
                 lst = dx
             else:
