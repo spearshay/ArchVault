@@ -120,6 +120,8 @@ def _fix_texture(tex, slot, res, conv=None):
         want_tc = tc.TC_NORMALMAP
     elif slot == "albedo":
         want_tc = cur_tc if cur_tc in (tc.TC_DEFAULT, tc.TC_BC7) else tc.TC_DEFAULT
+    elif slot == "orm":
+        want_tc = tc.TC_BC7  # 3 unrelated channels: BC1 (Default) crushes the subtle one, usually roughness
     else:
         want_tc = tc.TC_DEFAULT
     changes = []
@@ -261,6 +263,8 @@ _SAMPLER_WANTS = {
     "SAMPLERTYPE_LINEAR_GRAYSCALE": ((_TC.TC_GRAYSCALE,), _TC.TC_GRAYSCALE, False),
     "SAMPLERTYPE_MASKS": ((_TC.TC_MASKS,), _TC.TC_MASKS, False),
 }
+# per-parameter overrides of the above (packed maps: BC7 keeps all three channels' detail)
+_PARAM_WANTS = {"ORM Map": ((_TC.TC_BC7,), _TC.TC_BC7, False)}
 
 
 def _samplers(material):
@@ -291,7 +295,7 @@ def check_textures(mis, fix=True):
             if key in done:
                 continue
             done.add(key)
-            want = _SAMPLER_WANTS.get(samp[name])
+            want = _PARAM_WANTS.get(name) or _SAMPLER_WANTS.get(samp[name])
             if not want:
                 res["flags"].append("%s . %s: sampler %s not handled" % (mi.get_name(), name, samp[name]))
                 continue
